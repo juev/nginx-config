@@ -1,37 +1,62 @@
+limit_conn_zone $binary_remote_addr zone=addr:10m;
+
 server {
-	server_name  juev.ru;
-	rewrite ^(.*) http://www.juev.ru$1 permanent;
+  server_name  juev.ru juev.org www.juev.ru;
+  rewrite ^(.*) http://www.juev.org$1 permanent;
 }
 
 server {
-	listen 80;
-	server_name www.juev.ru;
+  listen 80;
+  server_name www.juev.org;
+  charset utf-8;
 
-	root /home/ubuntu/www/juevru;
-	index index.html index.htm;
-	autoindex off;
+  access_log  /home/user/logs/juevru/access.log;
+  error_log   /home/user/logs/juevru/error.log;
 
-	charset utf-8;
+  client_max_body_size 5M;
 
-	try_files $uri $uri/ =404;
 
-	error_page 403 404 /articles.html;
-	access_log  /home/ubuntu/logs/juevru/access.log;
-	error_log   /home/ubuntu/logs/juevru/error.log;
+  location ~* \.(db|hbs|conf)$  { deny all; }
+  location ~ /\.ht { deny all; }
+  location ~ /\. { deny all; }
+  location ~ ~$  { deny all; }
 
-	location ~ /\. {
-		deny all;
-		access_log      off;
-		log_not_found   off;
-	}
+  location ~ ^/(robots\.txt|favicon\.ico) {
+    root /home/user/web/seo/;
+    expires 30d;
+    access_log off;
+  }
 
-	location ~* ^.+\.(html|htm|php|xml|html.gz)$ {
-		add_header Cache-Control "max-age=0, no-cache";
-		add_header "X-UA-Compatible" "IE=Edge,chrome=1";
-	}
+#  location ~ ^/assets/(img|js|css|fonts)/  {
+#    root /home/user/web/ghost/content/themes/juev;
+#    expires 30d;
+#    access_log off;
+#  }
+#
+#  location ~ ^/(img/|css/|lib/|vendor/|fonts/) {
+#    root /home/user/web/ghost/content/themes/juev/assets;
+#    expires 30d;
+#    access_log off;
+#  }
 
-	location ~* ^.+\.(css|js|jpg|jpeg|gif|png|ico|gz|svg|svgz|ttf|otf|woff|eot|mp4|ogg|ogv|webm)$ {
-		access_log off;
-		add_header Cache-Control  "public, max-age=2592000";
-	}
+  location ~ ^/(content/images/) {
+    root /home/user/web/ghost;
+    expires 30d;
+    access_log off;
+  }
+
+  rewrite ^/atom.xml /rss/ permanent;
+  
+  location / {
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header HOST $http_host;
+    proxy_set_header X-NginX-Proxy true;
+
+    proxy_pass http://proxy_app;
+  }
+}
+
+upstream proxy_app {
+    # Use the default ghost port (2368)
+    server 127.0.0.1:2368;
 }
